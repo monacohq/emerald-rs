@@ -151,6 +151,13 @@ pub fn start(
 
     {
         let storage_ctrl = Arc::clone(&storage_ctrl);
+        io.add_method("emerald_exportPublicKey", move |p: Params| {
+            wrapper(serves::export_public_key(parse(p)?, &storage_ctrl))
+        });
+    }
+
+    {
+        let storage_ctrl = Arc::clone(&storage_ctrl);
         io.add_method("emerald_newAccount", move |p: Params| {
             wrapper(serves::new_account(parse(p)?, &sec_level, &storage_ctrl))
         });

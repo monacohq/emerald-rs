@@ -13,6 +13,7 @@ use std::cell::RefCell;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use util;
+use hex;
 
 fn to_chain_id(chain: &str, chain_id: Option<usize>, default_id: u8) -> u8 {
     if chain_id.is_some() {
@@ -269,6 +270,52 @@ pub fn export_account(
     debug!("Account exported: {}", kf.address);
 
     Ok(value)
+}
+
+#[derive(Deserialize)]
+pub struct ExportPublicKey {
+    address: String,
+    #[serde(default)]
+    passphrase: Option<String>,
+}
+
+pub fn export_public_key(
+    params: Either<(ExportPublicKey,), (ExportPublicKey, CommonAdditional)>,
+    storage: &Arc<Mutex<Arc<Box<StorageController>>>>,
+) -> Result<Value, Error> {
+    let storage_ctrl = storage.lock().unwrap();
+    let (input, additional) = params.into_full();
+    let storage = storage_ctrl.get_keystore(&additional.chain)?;
+    let addr = Address::from_str(&input.address)?;
+
+    match storage.search_by_address(&addr) {
+        Ok((_, kf)) => {
+            match kf.crypto {
+                CryptoType::Core(_) => {
+                    if input.passphrase.is_none() {
+                        return Err(Error::InvalidDataFormat("Missing passphrase".to_string()));
+                    }
+                    let pass = input.passphrase.unwrap();
+                    if let Ok(pk) = kf.decrypt_key(&pass) {
+                        let public_key = pk.to_public_key()?.serialize();
+                        let result = Value::String(format!(
+                            "0x{}",
+                            hex::encode(&public_key[..])
+                        ));
+                        Ok(result)
+                    } else {
+                        Err(Error::InvalidDataFormat("Invalid passphrase".to_string()))
+                    }
+                }
+
+                CryptoType::HdWallet(hw) => {
+
+                    Err(Error::InvalidDataFormat("TODO: HW wallet not yet supported".to_string()))
+                }
+            }
+        }
+        Err(_) => Err(Error::InvalidDataFormat("Can't find account".to_string())),
+    }
 }
 
 #[derive(Deserialize, Debug)]

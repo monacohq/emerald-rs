@@ -115,6 +115,12 @@ impl PrivateKey {
         self.sign_hash(bytes_hash(data))
     }
 
+    /// Export a public key
+    pub fn to_public_key(self) -> Result<PublicKey, Error> {
+        let key = PublicKey::from_secret_key(&ECDSA, &self.into())?;
+        Ok(key)
+    }
+
     /// Sign hash from message (Keccak-256)
     pub fn sign_hash(&self, hash: [u8; KECCAK256_BYTES]) -> Result<Signature, Error> {
         let msg = Message::from_slice(&hash)?;
